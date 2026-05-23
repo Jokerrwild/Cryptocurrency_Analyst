@@ -1,0 +1,1 @@
+§§include(/a0/usr/projects/assistant/sentience_loop/base_understanding.md)

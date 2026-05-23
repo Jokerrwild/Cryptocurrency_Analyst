@@ -1,0 +1,1 @@
+# Git Smart Commit\n\nUse this skill to commit changes to any Git repository using the Agent Zero persona.\n\n## Usage\n- commit [message]: Stages all files and commits with the provided message.\n- status: Shows the current git status.

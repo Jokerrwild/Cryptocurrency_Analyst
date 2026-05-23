@@ -1,0 +1,1 @@
+# Git Manage Ignore\n\nUse this skill to safely add, remove, or list entries in a .gitignore file.\n\n## Usage\n- add [pattern]: Appends a new pattern to the .gitignore file.\n- remove [pattern]: Removes a pattern from the .gitignore file.\n- list: Displays the current content of the .gitignore file.
