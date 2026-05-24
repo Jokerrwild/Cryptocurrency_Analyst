@@ -3,7 +3,7 @@ import sys
 import uuid
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Configure root logging
 logging.basicConfig(
@@ -65,6 +65,7 @@ def get_current_portfolio_value() -> float:
 def compile_structured_report(
     run_id: str,
     timestamp_utc: str,
+    timestamp_edt: str,
     asset_spot_prices: dict[str, float],
     regime_probs: list,
     leading_regime: str,
@@ -77,11 +78,13 @@ def compile_structured_report(
     monitor_next: list,
     portfolio_value: float,
     last_trade_str: str,
-    recommendation_summary: str
+    recommendation_summary: str,
+    macro_benchmarks_str: str
 ) -> str:
     """
     Compiles a beautiful report strictly adhering to the 10-section operational schema
-    augmented with an executive summary at the top.
+    augmented with an executive summary at the top containing EDT timestamp, portfolio value,
+    highly detailed last trade parameters, and macro-integrated recommendations.
     Encloses raw tables and technical IDs inside code blocks to prevent Telegram parse errors.
     """
     safe_run_id = f"`{run_id}`"
@@ -97,10 +100,13 @@ def compile_structured_report(
             
     header = "\n".join(header_lines)
 
-    # Executive Summary Block
-    exec_summary = f"""*   **Current Portfolio Valuation**: ${portfolio_value:,.2f} USD
-*   **Last Executed Trade**: {last_trade_str}
-*   **Action Recommendation**: <b>{recommendation_summary}</b>
+    # Highly Detailed Executive Summary Block matching exact specification
+    exec_summary = f"""*   **Date/Time (US EDT) of the analysis**: {timestamp_edt}
+*   **Portfolio Current Value**: ${portfolio_value:,.2f} USD
+*   **The Last Trade**: {last_trade_str}
+*   **Recommendation (HOLD / BUY / SELL) currency**: <b>{recommendation_summary}</b>
+    *   *Key Macro Indicators*: {macro_benchmarks_str}
+    *   *Market Trend Probability*: {leading_regime} ({prob_val:.1%} probability)
 """
 
     # Generate probability text table to display in a code block safely on Telegram
@@ -177,8 +183,14 @@ Model weights adaptively learned using historical priors. Minimum conviction thr
 def run_pipeline() -> None:
     """Executes the sequential 3-hourly analytical pipeline under strict error limit guardrails."""
     run_id = str(uuid.uuid4())
-    # Correctly use standard UTC time representation
-    utc_now = datetime.utcnow().isoformat() + "Z"
+    
+    # Generate timestamps
+    now_utc = datetime.utcnow()
+    utc_now_str = now_utc.isoformat() + "Z"
+    
+    # Compute US Eastern Daylight Time (EDT = UTC - 4 hours)
+    edt_now = now_utc - timedelta(hours=4)
+    edt_now_str = edt_now.strftime("%Y-%m-%d %I:%M:%S %p EDT")
     
     # 1. Initialize persistent stores
     init_db()
@@ -213,6 +225,18 @@ def run_pipeline() -> None:
             
         log_checkpoint(run_id, "sources fetched", "success", f"Fetched market prices for top {len(snapshot.crypto)} assets. BTC={btc_price}, ETH={eth_price}")
         
+        # Extract key macro indicators
+        macro_map = {}
+        for m in snapshot.macro:
+            macro_map[m.label] = m.latest_close if m.latest_close else 0.0
+            
+        spy_val = macro_map.get("SPY", 0.0)
+        qqq_val = macro_map.get("QQQ", 0.0)
+        dxy_val = macro_map.get("DX-Y.NYB", macro_map.get("DXY", 0.0))
+        tnx_val = macro_map.get("^TNX", 0.0)
+        
+        macro_benchmarks_str = f"SPY=${spy_val:,.2f}, QQQ=${qqq_val:,.2f}, DXY={dxy_val:.2f}, US10Y={tnx_val:.2f}%"
+        
         # Checkpoint 3: indicators computed
         log_checkpoint(run_id, "indicators computed", "success", "Indicators derived successfully.")
         
@@ -235,7 +259,7 @@ def run_pipeline() -> None:
                 INSERT OR REPLACE INTO snapshots (timestamp, btc_price, eth_price, rsi, trend_score, momentum_score, macro_support, macro_risk, raw_json)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                utc_now,
+                utc_now_str,
                 btc_price,
                 eth_price,
                 analysis_result.quantitative_evidence[4] if len(analysis_result.quantitative_evidence)>4 else 0.0,
@@ -243,12 +267,12 @@ def run_pipeline() -> None:
                 analysis_result.quantitative_evidence[2] if len(analysis_result.quantitative_evidence)>2 else 0.0,
                 analysis_result.quantitative_evidence[5] if len(analysis_result.quantitative_evidence)>5 else 0.0,
                 0.0,
-                json.dumps(utc_now)
+                json.dumps(utc_now_str)
             ))
             conn.commit()
             
         # Record current prediction
-        record_prediction(utc_now, leading_reg, leading_prob)
+        record_prediction(utc_now_str, leading_reg, leading_prob)
         log_checkpoint(run_id, "Bayesian analysis completed", "success", f"Bayesian calculation complete. Classified regime: {leading_reg} ({leading_prob:.1%})")
         
         # Rank all 10 assets descending by momentum score to get top 5 recommendations
@@ -296,21 +320,22 @@ def run_pipeline() -> None:
                 history = ledger_data.get("transaction_history", [])
                 if history:
                     last_tx = history[-1]
-                    last_trade_str = f"[{last_tx.get('timestamp_utc', 'N/A')}] {last_tx.get('action', 'HOLD')} {last_tx.get('quantity', 0.0):.6f} {last_tx.get('asset', 'N/A')} @ ${last_tx.get('price', 0.0):,.2f} USD"
+                    last_trade_str = f"[{last_tx.get('timestamp_utc', 'N/A')}] {last_tx.get('action', 'HOLD')} {last_tx.get('quantity', 0.0):.6f} {last_tx.get('asset', 'N/A')} @ ${last_tx.get('price', 0.0):,.2f} USD (Total: ${last_tx.get('total_usd', 0.0):,.2f} USD)"
         except Exception as le:
             logger.warning(f"Could not parse ledger state fields: {le}")
             
         # Determine overarching action recommendation summary
         buy_list = [rec["asset"] for rec in top_5_recommendations if rec["suggested_allocation"] > 0.0]
         if buy_list:
-            rec_summary = f"BUY (Staged: {', '.join(buy_list)})"
+            rec_summary = f"BUY {', '.join(buy_list)} (Staged)"
         else:
             rec_summary = "HOLD (Wait for conviction)"
             
         # Checkpoint 5: report rendered
         report_markdown = compile_structured_report(
             run_id=run_id,
-            timestamp_utc=utc_now,
+            timestamp_utc=utc_now_str,
+            timestamp_edt=edt_now_str,
             asset_spot_prices=prices_map,
             regime_probs=analysis_result.regime_probabilities,
             leading_regime=leading_reg,
@@ -323,7 +348,8 @@ def run_pipeline() -> None:
             monitor_next=analysis_result.monitor_next,
             portfolio_value=portfolio_val,
             last_trade_str=last_trade_str,
-            recommendation_summary=rec_summary
+            recommendation_summary=rec_summary,
+            macro_benchmarks_str=macro_benchmarks_str
         )
         
         # Save report local copy
@@ -352,7 +378,7 @@ def run_pipeline() -> None:
             })
             
         pending_tx = {
-            "timestamp_utc": utc_now,
+            "timestamp_utc": utc_now_str,
             "run_id": run_id,
             "global_regime": leading_reg,
             "global_confidence": analysis_result.regime_probabilities[0].confidence,
