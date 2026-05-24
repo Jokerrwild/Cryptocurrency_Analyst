@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import math
-from typing import Any
+import logging
+from typing import Any, List, Dict
 
 from .indicators import momentum_score, trend_score, volatility_score, volume_score
 from .models import AnalysisResult, MarketSnapshot, PositionSizing, RegimeProbability
 from .position_sizing import cross_asset_momentum_rank, suggest_allocation
 from .regulatory import get_regulatory_scores
 from .time_utils import utc_now_str
+from .weight_learner import get_adaptive_weights
+
+logger = logging.getLogger("crypto_analyst.bayesian")
 
 REGIMES = [
     "Bullish accumulation",
@@ -19,14 +23,13 @@ REGIMES = [
     "Macro-driven risk-off",
 ]
 
-
-def softmax(scores: dict[str, float]) -> dict[str, float]:
+def softmax(scores: Dict[str, float]) -> Dict[str, float]:
+    """Converts raw regime scores to a normalized probability distribution."""
     vals = list(scores.values())
     max_v = max(vals)
     exps = {k: math.exp(v - max_v) for k, v in scores.items()}
     total = sum(exps.values())
     return {k: v / total for k, v in exps.items()}
-
 
 def _macro_support(snapshot: MarketSnapshot) -> float:
     """Derive macro support signal from SPY/QQQ trend vs DXY."""
@@ -44,12 +47,13 @@ def _macro_support(snapshot: MarketSnapshot) -> float:
         dxy_drag = -1 * max(-0.5, min(0.5, (dxy.closes[-1] - dxy.closes[-2]) / (dxy.closes[-2] or 1) * 10))
     return max(-1.0, min(1.0, equity_signal + dxy_drag))
 
-
 def analyze_snapshot(
     snapshot: MarketSnapshot,
     cfg: dict[str, Any],
+    news_sentiment_score: float = 0.0,
+    news_headlines: List[str] = None,
 ) -> AnalysisResult:
-    """Core Bayesian analysis. Returns a fully populated AnalysisResult."""
+    """Core Bayesian analysis. Integrates adaptive prior weights, indicators, and news scores."""
     base_label = cfg.get("base_asset", "BTC")
     base_series = next(
         (s for s in snapshot.crypto if s.label == base_label),
@@ -63,46 +67,84 @@ def analyze_snapshot(
     volume = volume_score(base_series) if base_series else 0.5
     macro = _macro_support(snapshot)
 
-    # Volume invalidation: low volume weakens trend signals
+    # Volume confirmation constraint: weak volume reduces trend impact
     vol_weight = 0.5 + 0.5 * volume  # [0.5, 1.0]
 
     # Regulatory overlay
     reg_scores = get_regulatory_scores(base_label)
     reg_bias = reg_scores.get("bias", 0.0)
 
-    # --- Regime scoring ---
-    raw: dict[str, float] = {r: 0.0 for r in REGIMES}
+    # Retrieve active prior weights from the adaptive Weight Learner
+    adaptive_weights = get_adaptive_weights()
+
+    # --- Regime scoring with Adaptive Weights & News Sentiment weights ---
+    raw: Dict[str, float] = {r: 0.0 for r in REGIMES}
+    
+    # Helper to resolve feature weight with adaptive prior fallback
+    def w(regime: str, feature: str, default: float) -> float:
+        return adaptive_weights.get(regime, {}).get(feature, default)
+
+    # 1. Bullish Accumulation
     raw["Bullish accumulation"] = (
-        1.2 * max(0, trend) + 1.0 * max(0, momentum) + 0.8 * max(0, macro)
-        - 0.4 * volatility + 0.5 * volume + reg_bias
+        w("Bullish accumulation", "trend", 1.2) * max(0, trend) +
+        w("Bullish accumulation", "momentum", 1.0) * max(0, momentum) +
+        w("Bullish accumulation", "macro", 0.8) * max(0, macro) +
+        w("Bullish accumulation", "volatility", -0.4) * volatility +
+        w("Bullish accumulation", "volume", 0.5) * volume +
+        reg_bias + 0.5 * news_sentiment_score
     ) * vol_weight
+
+    # 2. Bullish Continuation
     raw["Bullish continuation"] = (
-        1.4 * max(0, trend) + 1.2 * max(0, momentum) + 0.8 * macro
-        - 0.35 * volatility + 0.4 * volume
+        w("Bullish continuation", "trend", 1.4) * max(0, trend) +
+        w("Bullish continuation", "momentum", 1.2) * max(0, momentum) +
+        w("Bullish continuation", "macro", 0.8) * macro +
+        w("Bullish continuation", "volatility", -0.35) * volatility +
+        w("Bullish continuation", "volume", 0.4) * volume +
+        0.3 * news_sentiment_score
     ) * vol_weight
+
+    # 3. Neutral Consolidation
     raw["Neutral consolidation"] = (
         0.8 - abs(trend) * 0.8 - abs(momentum) * 0.6 + 0.3
     )
+
+    # 4. Bearish Distribution
     raw["Bearish distribution"] = (
-        1.2 * max(0, -trend) + 1.0 * max(0, -momentum) - 0.8 * max(0, macro)
-        + 0.4 * volatility - 0.5 * volume - reg_bias
+        w("Bearish distribution", "trend", -1.2) * max(0, -trend) +
+        w("Bearish distribution", "momentum", -1.0) * max(0, -momentum) +
+        w("Bearish distribution", "macro", -0.8) * max(0, macro) +
+        w("Bearish distribution", "volatility", 0.4) * volatility +
+        w("Bearish distribution", "volume", -0.5) * volume -
+        reg_bias - 0.5 * news_sentiment_score
     ) * vol_weight
+
+    # 5. Bearish Continuation
     raw["Bearish continuation"] = (
-        1.4 * max(0, -trend) + 1.2 * max(0, -momentum) - 0.8 * macro
-        + 0.35 * volatility - 0.4 * volume
+        w("Bearish continuation", "trend", -1.4) * max(0, -trend) +
+        w("Bearish continuation", "momentum", -1.2) * max(0, -momentum) +
+        w("Bearish continuation", "macro", -0.8) * macro +
+        w("Bearish continuation", "volatility", 0.35) * volatility +
+        w("Bearish continuation", "volume", -0.4) * volume -
+        0.3 * news_sentiment_score
     ) * vol_weight
+
+    # 6. High-Volatility Transition
     raw["High-volatility transition"] = (
         1.5 * volatility + 0.3 * abs(momentum) + 0.2 * abs(trend)
     )
+
+    # 7. Macro-Driven Risk-Off
     raw["Macro-driven risk-off"] = (
-        1.3 * max(0, -macro) + 0.4 * volatility + 0.3 * max(0, -trend)
+        1.3 * max(0, -macro) + 0.4 * volatility + 0.3 * max(0, -trend) +
+        0.4 * max(0, -news_sentiment_score)
     )
 
     probs = softmax(raw)
     leading = max(probs, key=lambda k: probs[k])
     leading_prob = probs[leading]
 
-    # Confidence score: gap to second place, data coverage, signal coherence
+    # Confidence calculation
     sorted_probs = sorted(probs.values(), reverse=True)
     gap = sorted_probs[0] - sorted_probs[1] if len(sorted_probs) > 1 else 0.0
     data_coverage = min(1.0, (len(base_series.closes) if base_series else 0) / 50)
@@ -131,6 +173,7 @@ def analyze_snapshot(
         leading_regime=leading,
         target_asset=target_asset,
     )
+    
     pos_sizing = PositionSizing(
         target_asset=target_asset,
         win_probability=leading_prob,
@@ -140,12 +183,21 @@ def analyze_snapshot(
         rationale=ps_rationale,
     )
 
-    # --- Evidence builders ---
+    # --- Evidence compilers ---
     quant_evidence = _build_quant_evidence(base_series, trend, momentum, volatility, volume, macro, momentum_scores)
-    qual_evidence = ["Qualitative context: news feed and regulatory sentiment not yet injected. Use notes parameter."]
+    
+    qual_evidence = []
+    if news_headlines:
+        qual_evidence.extend(news_headlines)
+    else:
+        qual_evidence.append("No recent high-impact geopolitical or economic headlines parsed in this interval.")
+    qual_evidence.append(f"Aggregate News Sentiment Score: {news_sentiment_score:+.2f} (Weights: Clear/Threat ±0.18, Easing/Tightening ±0.15)")
+    qual_evidence.append(f"Regulatory Sentiment Bias: {reg_bias:+.2f}")
+    
     interpretation = _build_interpretation(leading, leading_prob, confidence_label, trend, momentum)
     invalidation = _build_invalidation(leading, trend, momentum)
     decision_support = _build_decision_support(leading, pos_sizing)
+    
     monitor_next = [
         f"{base_label} close relative to EMA-50",
         "DXY trend continuation or reversal",
@@ -168,10 +220,9 @@ def analyze_snapshot(
         monitor_next=monitor_next,
     )
 
-
 def _build_quant_evidence(
     series, trend, momentum, volatility, volume, macro, momentum_scores
-) -> list[str]:
+) -> List[str]:
     lines = []
     if series:
         lines.append(f"{series.label} latest close: ${series.latest_close:,.2f}" if series.latest_close else f"{series.label}: no price data")
@@ -184,7 +235,6 @@ def _build_quant_evidence(
         lines.append(f"  Momentum [{label}]: {score:+.3f}")
     return lines
 
-
 def _build_interpretation(regime, prob, confidence, trend, momentum) -> str:
     return (
         f"Leading regime is '{regime}' with posterior probability {prob:.1%} "
@@ -194,8 +244,7 @@ def _build_interpretation(regime, prob, confidence, trend, momentum) -> str:
         f"Treat this as a probabilistic belief state, not a deterministic prediction."
     )
 
-
-def _build_invalidation(regime, trend, momentum) -> list[str]:
+def _build_invalidation(regime, trend, momentum) -> List[str]:
     conds = []
     if "Bullish" in regime:
         conds.append("Trend flips negative (close drops below EMA-50)")
@@ -208,7 +257,6 @@ def _build_invalidation(regime, trend, momentum) -> list[str]:
         conds.append("Regime velocity exceeds 5% shift toward Bullish or Bearish")
         conds.append("Volume breakout above 1.5x average")
     return conds
-
 
 def _build_decision_support(regime, pos_sizing: PositionSizing) -> str:
     return (
