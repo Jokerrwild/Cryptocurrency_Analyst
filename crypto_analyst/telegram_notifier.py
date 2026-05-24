@@ -4,6 +4,7 @@ import urllib.request
 import urllib.parse
 import hashlib
 import logging
+import re
 from datetime import datetime
 from typing import List
 
@@ -23,14 +24,12 @@ def get_telegram_credentials() -> tuple[str, str]:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
     
-    # Try to load from framework plugin settings if environment is unset
     if (not token or not chat_id) and os.path.exists(TELEGRAM_PLUGIN_CONFIG):
         try:
             with open(TELEGRAM_PLUGIN_CONFIG, "r") as f:
                 plugin_data = json.load(f)
                 bots = plugin_data.get("bots", [])
                 if bots:
-                    # Extract credentials from the primary registered bot
                     bot = bots[0]
                     if not token:
                         token = bot.get("token", "")
@@ -41,6 +40,42 @@ def get_telegram_credentials() -> tuple[str, str]:
             logger.warning(f"Could not auto-load system plugin configuration: {e}")
             
     return token, chat_id
+
+def markdown_to_html(md_text: str) -> str:
+    """
+    Converts basic Markdown formatting to Telegram-compatible HTML tags.
+    Escapes HTML entities first to prevent parse errors from special characters like < or &.
+    Uses alphanumeric placeholders to avoid collision with formatting regexes.
+    """
+    # 1. Escape raw HTML entities to prevent parser crashes
+    html = md_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    
+    # 2. Convert preformatted code blocks: ```text ... ``` or ``` ... ``` to <pre>...</pre>
+    # We use a purely alphanumeric placeholder with NO underscores or special characters
+    code_blocks = []
+    def save_block(match):
+        code_blocks.append(match.group(1))
+        return f"HTMLPLACEHOLDER{len(code_blocks)-1}BLOCK"
+    
+    html = re.sub(r"```(?:\w+)?\n(.*?)\n```", save_block, html, flags=re.DOTALL)
+    
+    # 3. Convert inline code spans `code` to <code>code</code>
+    html = re.sub(r"`([^`]+)`", r"<code>\1</code>", html)
+    
+    # 4. Convert bold marks **text** to <b>text</b>
+    html = re.sub(r"\*\*([^\*]+)\*\*", r"<b>\1</b>", html)
+    
+    # 5. Convert italic marks _text_ to <i>text</i>
+    html = re.sub(r"_([^_]+)_", r"<i>\1</i>", html)
+    
+    # 6. Convert headers ### Header or ## Header or # Header to bold lines
+    html = re.sub(r"^(?:###|##|#)\s+(.*?)$", r"<b>\1</b>", html, flags=re.MULTILINE)
+    
+    # Restore preformatted code blocks
+    for i, block in enumerate(code_blocks):
+        html = html.replace(f"HTMLPLACEHOLDER{i}BLOCK", f"<pre>{block}</pre>")
+        
+    return html
 
 def split_report(report_text: str, max_chars: int = 4000) -> List[str]:
     """
@@ -57,7 +92,6 @@ def split_report(report_text: str, max_chars: int = 4000) -> List[str]:
     lines = report_text.split('\n')
     
     for line in lines:
-        # Segment boundary checks - split strictly at section headers
         is_header = line.strip().startswith('## ') or line.strip().startswith('# ') or line.strip().startswith('### ')
         line_len = len(line) + 1
         
@@ -91,7 +125,7 @@ def log_delivery_audit(attempt: int, code: int, body_hash: str, msg_id: str, sta
 
 def send_telegram_report(report_text: str) -> List[str]:
     """
-    Splits the structured analysis report and dispatches it to Telegram.
+    Splits the structured analysis report, converts to HTML, and dispatches it to Telegram.
     Enforces strict API response verification, 3-retry exponential backoff,
     and records every attempt in the SQLite delivery_audit table.
     """
@@ -103,26 +137,25 @@ def send_telegram_report(report_text: str) -> List[str]:
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     delivered_message_ids = []
     
+    # Split raw report into compliant chunks FIRST before converting to HTML
     chunks = split_report(report_text)
     logger.info(f"Report split into {len(chunks)} chunks for Telegram distribution.")
     
     for idx, chunk in enumerate(chunks):
+        # Convert Markdown formatting to HTML safely
+        html_chunk = markdown_to_html(chunk)
+        
         payload = {
             "chat_id": chat_id,
-            "text": chunk,
-            "parse_mode": "Markdown",
+            "text": html_chunk,
+            "parse_mode": "HTML",
             "disable_web_page_preview": True
         }
         
         data = json.dumps(payload).encode('utf-8')
-        req = urllib.request.Request(
-            url,
-            data=data,
-            headers={
-                'Content-Type': 'application/json',
-                'User-Agent': 'CryptoAnalystTelegramNotifier/1.1'
-            }
-        )
+        req = urllib.request.Request(url, data=data)
+        req.add_header('Content-Type', 'application/json')
+        req.add_header('User-Agent', 'CryptoAnalystTelegramNotifier/1.2')
         
         success = False
         last_error = None
@@ -136,7 +169,6 @@ def send_telegram_report(report_text: str) -> List[str]:
                     
                     res_json = json.loads(resp_str)
                     
-                    # Validate presence of confirmed message_id
                     if res_json.get("ok") and "result" in res_json and "message_id" in res_json["result"]:
                         msg_id = str(res_json["result"]["message_id"])
                         delivered_message_ids.append(msg_id)

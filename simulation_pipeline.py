@@ -26,6 +26,7 @@ from crypto_analyst.db import (
 from crypto_analyst.sources import fetch_market_snapshot
 from crypto_analyst.news_feed import ingest_and_score_news
 from crypto_analyst.bayesian import analyze_snapshot
+from crypto_analyst.indicators import momentum_score, trend_score
 from crypto_analyst.weight_learner import record_prediction, resolve_regime_outcome, run_adaptive_update
 from crypto_analyst.telegram_notifier import send_telegram_report
 from crypto_analyst.worklog_util import log_incident_or_event
@@ -64,8 +65,7 @@ def get_current_portfolio_value() -> float:
 def compile_structured_report(
     run_id: str,
     timestamp_utc: str,
-    btc_price: float,
-    eth_price: float,
+    asset_spot_prices: dict[str, float],
     regime_probs: list,
     leading_regime: str,
     prob_val: float,
@@ -73,68 +73,99 @@ def compile_structured_report(
     qual_ev: list,
     interpretation: str,
     invalidation: list,
-    decision_support: str,
+    top_5_recommendations: list[dict],
     monitor_next: list
 ) -> str:
     """
     Compiles a beautiful report strictly adhering to the 10-section operational schema.
-    Schema: Header, Market Thesis, Probability Table, Quantitative Evidence, Qualitative Evidence,
-    Interpretation, Invalidation Conditions, Risk-Aware Decision Support, What To Monitor Next, Learning Notes.
+    Encloses raw tables and technical IDs inside code blocks to prevent Telegram parse errors.
     """
-    header = f"""# Core Report ID: {run_id}
-*   **Generated Timestamp (UTC)**: {timestamp_utc}
-*   **Interval Label**: 3-Hourly Scheduled Pulse
-*   **Tracked Assets**: BTC, ETH
-*   **Current Portfolio Valuation**: ${get_current_portfolio_value():,.2f} USD
-*   **BTC Spot Price**: ${btc_price:,.2f} USD | **ETH Spot Price**: ${eth_price:,.2f} USD
-"""
+    safe_run_id = f"`{run_id}`"
+    
+    header_lines = [
+        f"*   **Report ID**: {safe_run_id}",
+        f"*   **Generated Timestamp (UTC)**: {timestamp_utc}",
+        f"*   **Interval Label**: 3-Hourly Scheduled Pulse",
+        f"*   **Current Portfolio Valuation**: ${get_current_portfolio_value():,.2f} USD"
+    ]
+    for symbol in ["BTC", "ETH", "SOL", "XRP"]:
+        if symbol in asset_spot_prices:
+            header_lines.append(f"*   **{symbol} Spot Price**: ${asset_spot_prices[symbol]:,.2f} USD")
+            
+    header = "\n".join(header_lines)
 
-    # Generate probability markdown table
-    prob_table_lines = ["| Market Regime | Posterior Probability | Confidence Label |", "| :--- | :---: | :---: |"]
+    # Generate probability text table to display in a code block safely on Telegram
+    prob_table_lines = [
+        "```text",
+        f"{'Market Regime':<30} | {'Probability':<11} | {'Confidence':<10}",
+        "-" * 58
+    ]
     for p in regime_probs:
-        prob_table_lines.append(f"| {p.regime} | {p.probability:.1%} | {p.confidence} |")
+        prob_table_lines.append(f"{p.regime:<30} | {p.probability:<11.1%} | {p.confidence:<10}")
+    prob_table_lines.append("```")
     prob_table = "\n".join(prob_table_lines)
 
-    quant_section = "\n".join([f"- {item}" for item in quant_ev])
-    qual_section = "\n".join([f"- {item}" for item in qual_ev])
-    invalidation_section = "\n".join([f"- {item}" for item in invalidation])
-    monitor_section = "\n".join([f"- {item}" for item in monitor_next])
+    # Generate Top 5 Recommendations Table
+    rec_table_lines = [
+        "```text",
+        f"{'Rank':<4} | {'Asset':<6} | {'Spot Price':<12} | {'Momentum':<10} | {'Rec Allocation':<15}",
+        "-" * 58
+    ]
+    for r in top_5_recommendations:
+        price_str = f"${r['spot_price']:,.2f}" if r['spot_price'] > 0 else "N/A"
+        alloc_str = f"{r['suggested_allocation']:.1f}% (BUY)" if r['suggested_allocation'] > 0 else "0.0% (HOLD)"
+        mom_str = f"{r['momentum']:+.3f}"
+        rec_table_lines.append(f"{r['rank']:<4} | {r['asset']:<6} | {price_str:<12} | {mom_str:<10} | {alloc_str:<15}")
+    rec_table_lines.append("```")
+    rec_table = "\n".join(rec_table_lines)
 
-    report = f"""
+    # Wrap individual list bullets cleanly
+    quant_section = "\n".join([f"* {item}" for item in quant_ev])
+    qual_section = "\n".join([f"* {item}" for item in qual_ev])
+    invalidation_section = "\n".join([f"* {item}" for item in invalidation])
+    monitor_section = "\n".join([f"* {item}" for item in monitor_next])
+
+    report = f"""### **System Analysis Report**
 {header}
 
-## Market Thesis
-Leading regime is currently classified as '{leading_regime}' with a posterior probability weight of {prob_val:.1%}.
+### **Market Thesis**
+Leading regime is classified as *{leading_regime}* with a posterior probability weight of *{prob_val:.1%}*.
 
-## Probability Table
+### **Probability Table**
 {prob_table}
 
-## Quantitative Evidence
+### **Quantitative Evidence**
 {quant_section}
 
-## Qualitative Evidence
+### **Qualitative Evidence**
 {qual_section}
 
-## Interpretation
+### **Interpretation**
 {interpretation}
 
-## Invalidation Conditions
+### **Invalidation Conditions**
 {invalidation_section}
 
-## Risk-Aware Decision Support
-{decision_support}
+### **Risk-Aware Decision Support**
+**Global Thesis Action Strategy**: Guided by Bayesian Regime *{leading_regime}*.
 
-## What To Monitor Next
+**Top 5 Currencies Priority List**:
+{rec_table}
+
+All suggestions are trade recommendations awaiting strict Human-in-the-Loop (HITL) manual confirmation.
+
+### **What To Monitor Next**
 {monitor_section}
 
-## Learning Notes
-Model weights adaptively learned using historical priors. Minimum conviction threshold enforced at 55%. If leading probability falls below conviction threshold, recommended allocation defaults to HOLD state.
+### **Learning Notes**
+Model weights adaptively learned using historical priors. Minimum conviction threshold enforced at 55%. If leading probability falls below conviction threshold, recommended allocation defaults to HOLD state across all assets.
 """
     return report.strip()
 
 def run_pipeline() -> None:
     """Executes the sequential 3-hourly analytical pipeline under strict error limit guardrails."""
     run_id = str(uuid.uuid4())
+    # Correctly use standard UTC time representation
     utc_now = datetime.utcnow().isoformat() + "Z"
     
     # 1. Initialize persistent stores
@@ -157,32 +188,33 @@ def run_pipeline() -> None:
         
         # Checkpoint 2: sources fetched
         snapshot = fetch_market_snapshot(cfg)
-        btc_series = next((s for s in snapshot.crypto if s.label == "BTC"), None)
-        eth_series = next((s for s in snapshot.crypto if s.label == "ETH"), None)
-        btc_price = btc_series.latest_close if btc_series and btc_series.latest_close else 0.0
-        eth_price = eth_series.latest_close if eth_series and eth_series.latest_close else 0.0
         
+        # Map current prices for all tracked assets
+        prices_map = {}
+        for s in snapshot.crypto:
+            prices_map[s.label] = s.latest_close if s.latest_close else 0.0
+            
+        btc_price = prices_map.get("BTC", 0.0)
+        eth_price = prices_map.get("ETH", 0.0)
         if btc_price == 0.0 or eth_price == 0.0:
             raise ValueError("Market data retrieval failed: critical spot prices are missing.")
             
-        log_checkpoint(run_id, "sources fetched", "success", f"Fetched market prices: BTC={btc_price}, ETH={eth_price}")
+        log_checkpoint(run_id, "sources fetched", "success", f"Fetched market prices for top {len(snapshot.crypto)} assets. BTC={btc_price}, ETH={eth_price}")
         
         # Checkpoint 3: indicators computed
-        # Handled inside the sources module during parsing, log boundary success
         log_checkpoint(run_id, "indicators computed", "success", "Indicators derived successfully.")
         
         # Checkpoint 4: Bayesian analysis completed
-        # First ingest public RSS news and score sentiment
         news_score, news_headlines_data = ingest_and_score_news()
-        headlines = [item["title"] for item in news_headlines_data[:5]] # Keep top 5 headlines
+        headlines = [item["title"] for item in news_headlines_data[:5]]
         
-        # Resolve any past predictions (Look back to find unresolved regime outcomes)
-        # For simulation, we resolve outcomes older than 24h as 'Bullish continuation' or 'Neutral consolidation' based on price changes
         # Run weight updates conservatively
         run_adaptive_update()
         
-        # Execute core Bayesian model
+        # Execute core Bayesian model on the base asset to determine global Market Thesis
         analysis_result = analyze_snapshot(snapshot, cfg, news_sentiment_score=news_score, news_headlines=headlines)
+        leading_reg = analysis_result.leading_regime
+        leading_prob = analysis_result.regime_probabilities[0].probability
         
         # Persist snapshot state to SQLite snapshots table
         with get_db_connection() as conn:
@@ -191,37 +223,70 @@ def run_pipeline() -> None:
                 INSERT OR REPLACE INTO snapshots (timestamp, btc_price, eth_price, rsi, trend_score, momentum_score, macro_support, macro_risk, raw_json)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                utc_now, 
-                btc_price, 
-                eth_price, 
-                analysis_result.quantitative_evidence[4] if len(analysis_result.quantitative_evidence)>4 else 0.0, # rsi proxy
-                analysis_result.quantitative_evidence[1] if len(analysis_result.quantitative_evidence)>1 else 0.0, # trend proxy
-                analysis_result.quantitative_evidence[2] if len(analysis_result.quantitative_evidence)>2 else 0.0, # momentum proxy
-                analysis_result.quantitative_evidence[5] if len(analysis_result.quantitative_evidence)>5 else 0.0, # macro proxy
-                0.0, 
+                utc_now,
+                btc_price,
+                eth_price,
+                analysis_result.quantitative_evidence[4] if len(analysis_result.quantitative_evidence)>4 else 0.0,
+                analysis_result.quantitative_evidence[1] if len(analysis_result.quantitative_evidence)>1 else 0.0,
+                analysis_result.quantitative_evidence[2] if len(analysis_result.quantitative_evidence)>2 else 0.0,
+                analysis_result.quantitative_evidence[5] if len(analysis_result.quantitative_evidence)>5 else 0.0,
+                0.0,
                 json.dumps(utc_now)
             ))
             conn.commit()
             
         # Record current prediction
-        record_prediction(utc_now, analysis_result.leading_regime, analysis_result.regime_probabilities[0].probability)
+        record_prediction(utc_now, leading_reg, leading_prob)
+        log_checkpoint(run_id, "Bayesian analysis completed", "success", f"Bayesian calculation complete. Classified regime: {leading_reg} ({leading_prob:.1%})")
         
-        log_checkpoint(run_id, "Bayesian analysis completed", "success", f"Bayesian calculation complete. Classified regime: {analysis_result.leading_regime}")
+        # Rank all 10 assets descending by momentum score to get top 5 recommendations
+        asset_scores = []
+        for s in snapshot.crypto:
+            if s.closes:
+                m_score = momentum_score(s)
+                t_score = trend_score(s)
+                asset_scores.append({
+                    "asset": s.label,
+                    "spot_price": s.latest_close if s.latest_close else 0.0,
+                    "momentum": m_score,
+                    "trend": t_score
+                })
+                
+        # Sort descending by individual asset momentum score
+        sorted_assets = sorted(asset_scores, key=lambda x: -x["momentum"])
         
+        # Build Top 5 Recommendations list
+        top_5_recommendations = []
+        for rank, item in enumerate(sorted_assets[:5], 1):
+            suggested_allocation = 0.0
+            # Apply Bayesian Sizing rules based on the Global Market Thesis
+            if leading_prob >= 0.55 and ("Bullish" in leading_reg) and item["momentum"] > 0:
+                # If thesis is highly bullish, compute a proportional Half-Kelly size bounded by a conservative 10% safety cap per asset
+                kelly_raw = (leading_prob * 2.0 - 1.0) / 2.0
+                half_kelly = max(0.0, kelly_raw / 2.0)
+                suggested_allocation = min(10.0, half_kelly * 100.0) # Cap at 10.0% max per asset
+                
+            top_5_recommendations.append({
+                "rank": rank,
+                "asset": item["asset"],
+                "spot_price": item["spot_price"],
+                "momentum": item["momentum"],
+                "suggested_allocation": suggested_allocation
+            })
+            
         # Checkpoint 5: report rendered
         report_markdown = compile_structured_report(
             run_id=run_id,
             timestamp_utc=utc_now,
-            btc_price=btc_price,
-            eth_price=eth_price,
+            asset_spot_prices=prices_map,
             regime_probs=analysis_result.regime_probabilities,
-            leading_regime=analysis_result.leading_regime,
-            prob_val=analysis_result.regime_probabilities[0].probability,
+            leading_regime=leading_reg,
+            prob_val=leading_prob,
             quant_ev=analysis_result.quantitative_evidence,
             qual_ev=analysis_result.qualitative_evidence,
             interpretation=analysis_result.interpretation,
             invalidation=analysis_result.invalidation_conditions,
-            decision_support=analysis_result.decision_support,
+            top_5_recommendations=top_5_recommendations,
             monitor_next=analysis_result.monitor_next
         )
         
@@ -240,23 +305,28 @@ def run_pipeline() -> None:
         log_checkpoint(run_id, "message_id confirmed", "success", "Audit confirms receipt validation success.")
         
         # Checkpoint 7: ledger updated only if approved
-        # Generate pending transaction request for HITL
-        suggested_pct = analysis_result.position_sizing.suggested_pct if analysis_result.position_sizing else 0.0
-        target_asset = analysis_result.position_sizing.target_asset if analysis_result.position_sizing else "BTC"
-        
+        # Generate pending transactions for all top 5 candidates
+        staged_transactions = []
+        for rec in top_5_recommendations:
+            staged_transactions.append({
+                "asset": rec["asset"],
+                "action": "BUY" if rec["suggested_allocation"] > 0 else "HOLD",
+                "allocation_percentage": rec["suggested_allocation"],
+                "spot_price": rec["spot_price"]
+            })
+            
         pending_tx = {
             "timestamp_utc": utc_now,
             "run_id": run_id,
-            "action": "BUY" if suggested_pct > 0 else "HOLD",
-            "target_asset": target_asset,
-            "allocation_percentage": suggested_pct,
-            "spot_price": btc_price if target_asset == "BTC" else eth_price,
+            "global_regime": leading_reg,
+            "global_confidence": analysis_result.regime_probabilities[0].confidence,
+            "recommendations": staged_transactions,
             "approved": False
         }
         with open(PENDING_TX_PATH, "w") as tx_file:
             json.dump(pending_tx, tx_file, indent=2)
             
-        log_checkpoint(run_id, "ledger updated only if approved", "success", "Staged transaction in pending_transaction.json. Awaiting HITL approval.")
+        log_checkpoint(run_id, "ledger updated only if approved", "success", "Staged recommendations in pending_transaction.json. Awaiting HITL approval.")
         
         # Process rolling database cleanups
         prune_old_data(days_limit=30)
@@ -273,9 +343,9 @@ def run_pipeline() -> None:
             scope="simulation_pipeline orchestration layer",
             failed_hypotheses="Pipeline serial step transition mapping",
             root_cause=f"Exception: {type(e).__name__}",
-            resolution="System execution halted, scheduled triggered disabled to prevent runaway loops",
-            prevention="Resolve underlying resource or network timeout issue, reset system freeze toggle",
-            tags="#orchestrator | #execution_fault",
+            resolution="System execution halted, scheduled triggers disabled to prevent runaway loops",
+            prevention="Safe-escape markdown characters and prevent nested layout syntax",
+            tags="#orchestrator | #multi_asset",
             freeze_triggered=True
         )
         
