@@ -74,10 +74,14 @@ def compile_structured_report(
     interpretation: str,
     invalidation: list,
     top_5_recommendations: list[dict],
-    monitor_next: list
+    monitor_next: list,
+    portfolio_value: float,
+    last_trade_str: str,
+    recommendation_summary: str
 ) -> str:
     """
-    Compiles a beautiful report strictly adhering to the 10-section operational schema.
+    Compiles a beautiful report strictly adhering to the 10-section operational schema
+    augmented with an executive summary at the top.
     Encloses raw tables and technical IDs inside code blocks to prevent Telegram parse errors.
     """
     safe_run_id = f"`{run_id}`"
@@ -85,14 +89,19 @@ def compile_structured_report(
     header_lines = [
         f"*   **Report ID**: {safe_run_id}",
         f"*   **Generated Timestamp (UTC)**: {timestamp_utc}",
-        f"*   **Interval Label**: 3-Hourly Scheduled Pulse",
-        f"*   **Current Portfolio Valuation**: ${get_current_portfolio_value():,.2f} USD"
+        f"*   **Interval Label**: 3-Hourly Scheduled Pulse"
     ]
     for symbol in ["BTC", "ETH", "SOL", "XRP"]:
         if symbol in asset_spot_prices:
             header_lines.append(f"*   **{symbol} Spot Price**: ${asset_spot_prices[symbol]:,.2f} USD")
             
     header = "\n".join(header_lines)
+
+    # Executive Summary Block
+    exec_summary = f"""*   **Current Portfolio Valuation**: ${portfolio_value:,.2f} USD
+*   **Last Executed Trade**: {last_trade_str}
+*   **Action Recommendation**: <b>{recommendation_summary}</b>
+"""
 
     # Generate probability text table to display in a code block safely on Telegram
     prob_table_lines = [
@@ -127,6 +136,9 @@ def compile_structured_report(
 
     report = f"""### **System Analysis Report**
 {header}
+
+### **Executive Summary**
+{exec_summary}
 
 ### **Market Thesis**
 Leading regime is classified as *{leading_regime}* with a posterior probability weight of *{prob_val:.1%}*.
@@ -274,6 +286,27 @@ def run_pipeline() -> None:
                 "suggested_allocation": suggested_allocation
             })
             
+        # Parse state ledger fields dynamically for Executive Summary rendering
+        portfolio_val = 1000.00
+        last_trade_str = "None (Initial Capital Staging)"
+        try:
+            with open(LEDGER_PATH, "r") as lf:
+                ledger_data = json.load(lf)
+                portfolio_val = float(ledger_data.get("portfolio_value_usd", 1000.00))
+                history = ledger_data.get("transaction_history", [])
+                if history:
+                    last_tx = history[-1]
+                    last_trade_str = f"[{last_tx.get('timestamp_utc', 'N/A')}] {last_tx.get('action', 'HOLD')} {last_tx.get('quantity', 0.0):.6f} {last_tx.get('asset', 'N/A')} @ ${last_tx.get('price', 0.0):,.2f} USD"
+        except Exception as le:
+            logger.warning(f"Could not parse ledger state fields: {le}")
+            
+        # Determine overarching action recommendation summary
+        buy_list = [rec["asset"] for rec in top_5_recommendations if rec["suggested_allocation"] > 0.0]
+        if buy_list:
+            rec_summary = f"BUY (Staged: {', '.join(buy_list)})"
+        else:
+            rec_summary = "HOLD (Wait for conviction)"
+            
         # Checkpoint 5: report rendered
         report_markdown = compile_structured_report(
             run_id=run_id,
@@ -287,7 +320,10 @@ def run_pipeline() -> None:
             interpretation=analysis_result.interpretation,
             invalidation=analysis_result.invalidation_conditions,
             top_5_recommendations=top_5_recommendations,
-            monitor_next=analysis_result.monitor_next
+            monitor_next=analysis_result.monitor_next,
+            portfolio_value=portfolio_val,
+            last_trade_str=last_trade_str,
+            recommendation_summary=rec_summary
         )
         
         # Save report local copy
