@@ -1,176 +1,102 @@
 # Master Procedural Blueprint: Crypto Market Trade & Simulation Application
 
 **Author**: Senior Cryptocurrency Market & Macro-Statistical Analyst  
-**Version**: 1.0.0  
+**Version**: 1.1.0  
 **Date**: May 2026  
 **Target Environment**: Agent Zero / Debian Linux VPS / Docker (Python 3.12+)  
 
 ---
 
 ## 1. Executive Summary & Core Objective
-This document provides an absolute, step-by-step technical blueprint to build, deploy, and maintain the **Crypto Market Trade Analysis Application** (the "Application") inside the Cryptocurrency Analyst environment.
 
 ### Core Objective
-Simulate an investment campaign starting with a baseline capital of **$1,000.00 USD** in Cash, targeting a net Return on Investment (ROI) of **$3,000.00** (total portfolio valuation of **$4,000.00**) within a **30-day timeframe** using systematic quantitative methods. The application runs every 3 hours starting at 12:00 AM UTC, compiling technical indicators, parsing zero-cost geopolitical RSS news feeds, updating a Bayesian belief-state model, and issuing risk-aware, Kelly-optimized simulated trade recommendations that require **Human-in-the-Loop (HITL)** approval before ledger commitment.
+"The objective of this application is to produce disciplined, repeatable, probability-based market analysis and maintain an auditable simulated investment ledger under strict Human-in-the-Loop approval. The system is not permitted to optimize toward a fixed profit target or alter its behavior to chase a portfolio outcome."
+
+### System Nature
+The application is built as a **probabilistic market analysis and simulation engine**, not a profit-seeking optimizer. Its job is to collect evidence, score regimes, generate risk-aware recommendations, and preserve a faithful simulation ledger under strict Human-in-the-Loop (HITL) control.
+
+### Temporal Alignment
+Use UTC (Coordinated Universal Time) exclusively for all scheduler triggers, database timestamps, report timestamps, worklog timestamps, and ledger events. Local display time conversion is only permitted in user-facing delivery if explicitly requested.
 
 ---
 
-## 2. System Architecture & Data Flow Topology
+## 2. System Architecture & Modular Topology
+
+The application consists of the following explicit modules. No behavior may be inferred loosely or self-modified:
+
+*   **`simulation_pipeline.py`**: The sole orchestrator of the scheduled runs. Coordinates all other modules sequentially and manages checkpoint persistence.
+*   **`sources.py`**: Handles raw crypto spot price ingestion (Coinbase or equivalent) and macroeconomic indices (Yahoo Finance or equivalent for SPY, QQQ, DXY, 10Y yields).
+*   **`news_feed.py`**: Ingests public RSS feeds from CoinDesk, CoinTelegraph, and The Block. Performs XML parsing, keyword-based classification, hash-based deduplication, and scores interval news sentiment.
+*   **`bayesian.py`**: Evaluates technical and macro signals, computes posterior probability distributions across 7 core market regimes, assigns confidence labels, and generates position-sizing suggestions.
+*   **`weight_learner.py`**: Dedicated learning module. Records predictions, resolves outcomes relative to actual market structures, and updates learned weights conservatively over time.
+*   **`db.py`**: Coordinates database schemas, execution inserts, data retrieval, 30-day automatic pruning, and checkpoint/delivery audit persistence.
+*   **`telegram_notifier.py`**: Formats the report schema, manages clean section-boundary splitting for message size compliance, and handles message dispatch and validation.
+*   **`worklog_util.py`**: Standardized utility layer for programmatically updating the persistent `WORKLOG.md` on system events or errors.
+
+---
+
+## 3. Mandatory Persistence & Database Schema
+
+The SQLite database `market_pulse.db` will enforce the following strict tables:
+
+1.  **`snapshots`**: Stores raw interval market state indicators (timestamp, ticker spot prices, RSI, trend/momentum metrics, volume indicators, raw macro inputs).
+2.  **`news_events`**: Stores unique cryptographic MD5 hashes of parsed headlines, source labels, classifications, and individual sentiment scores for deduplication.
+3.  **`regime_outcomes`**: Records predicted regime profiles, probability weights, and actual resolved market regimes for weight calibration.
+4.  **`weight_priors`**: Maintains the persistent states of learned regime-feature weights, means, and mathematical uncertainty bands.
+5.  **`delivery_audit`**: Logs each Telegram transmission attempt, HTTP response code, response body hash, and the successfully confirmed `message_id` on delivery completion.
+6.  **`pipeline_runs`** (or `checkpoint_events`): Implements stage-by-stage boundary checkpoint observability for each scheduled execution (fired, fetched, computed, completed, sent).
+7.  **`system_state`**: Stores persistent freeze-state settings (e.g. `pipeline_frozen: true`) ensuring it survives process restarts and stops further network operations on failure.
+
+---
+
+## 4. Operational Control & Risk Guardrails
+
+*   **Human-In-The-Loop (HITL) Control**: No trade, allocation change, ledger mutation, or transaction commit may occur in `ledger.json` without explicit, validated human approval. Recommendations may be rendered and staged in the DB or Telegram, but the ledger remains unchanged until sign-off is committed.
+*   **Kelly Sizing Limitations**: Full Kelly sizing is strictly prohibited. The system must utilize **Half-Kelly sizing only**, bounded by absolute safety limits (default: max 25% single-asset exposure, 0% below the conviction threshold).
+*   **Minimum Conviction Threshold**: If the leading regime's posterior probability is below **55%** (action threshold), the system defaults to a **HOLD** recommendation, regardless of whether that regime technically leads the table.
+*   **News Scoring Boundaries**: Qualitative news scores are supportive evidence only. They may adjust regime scoring weights, but they are not permitted to dominate price and macro-economic trends.
+*   **Volume Confirmation**: Crypto-native volume indicators must remain part of the core technical trend verification path. Unconfirmed price breakouts on low relative volume must weaken the resulting bullish regime weights.
+*   **Simulation-First Execution**: The system is simulation-first. It recommends, simulates, and records, but does not execute real asset trades.
+
+---
+
+## 5. Strict Reporting & Telegram splitting
+
+### Verbatim Reporting Rule
+"Every scheduled run must generate the same report schema in the same order: Header, Market Thesis, Probability Table, Quantitative Evidence, Qualitative Evidence, Interpretation, Invalidation Conditions, Risk-Aware Decision Support, What To Monitor Next, Learning Notes."
+
+*   **Tone**: Strict probabilistic, objective, and quantitative tone. Deterministic buy/sell language is prohibited.
+*   **Sizing**: Suggested trade adjustments must be clearly presented as proposed recommendations awaiting human signature.
+*   **Smart Splitting**: If a message exceeds 4,000 characters, it must split **only at section headers**. Splitting mid-table, mid-bullet, or inside code blocks is strictly prohibited.
+
+---
+
+## 6. Implementation & Adaptive Weighting Rules
+
+### Verbatim Adaptive Weighting Rule
+"Adaptive weighting requires a dedicated `weight_learner.py` module and persistent `weight_priors` storage. Adaptive learning must be conservative in early cycles and must never bypass volume confirmation or other existing invalidation safeguards."
+
+### Verbatim Diagnostics Rule
+"Every scheduled run must persist checkpoint status for each pipeline boundary. Delivery is not considered successful unless Telegram returns a valid `message_id` and that value is recorded in persistence."
+
+### Scheduled Execution Behavior
+Scheduled runs must only execute the defined sequential pipeline steps. They are strictly prohibited from self-modifying code, patching source modules, or attempting autonomous error remediation. On any failure, the application must **fail loudly, log, write `pipeline_frozen: true` to the state, notify the user, and immediately stop.**
+
+---
+
+## 7. Programmatic `WORKLOG.md` Schema
+
+To ensure auditability, any logged entries (especially incidents and fixes) must be appended according to this strict format:
+
+```markdown
+### Incident ID: <UUID>
+*   **Timestamp (UTC)**: YYYY-MM-DD HH:MM:SS
+*   **Symptom**: Precise error traceback or system behavioral anomaly.
+*   **Scope**: Affected modules, tables, or integration boundaries.
+*   **Failed Hypotheses**: Paths investigated that did not resolve the issue.
+*   **Root Cause**: Underlying trigger of the failure.
+*   **Resolution**: Exact code modification or configuration change applied.
+*   **Prevention**: Architectural safeguards implemented to prevent regression.
+*   **Tags**: #database | #network | #math
+*   **Freeze Triggered**: Yes/No
 ```
-                     +-------------------------------+                      
-                     |    3-Hour Scheduler Trigger   |                      
-                     +---------------+---------------+                      
-                                     |                                      
-                                     v                                      
-                     +---------------+---------------+                      
-                     |    simulation_pipeline.py     |                      
-                     +---------------+---------------+                      
-                                     |                                      
-            +------------------------+------------------------+             
-            |                        |                        |             
-            v                        v                        v             
-  +---------+---------+    +---------+---------+    +---------+---------+   
-  |   sources.py      |    |   news_feed.py    |    |   db.py           |   
-  | (Prices / Macro)  |    | (RSS Ingestion)   |    | (SQLite Storage)  |   
-  +---------+---------+    +---------+---------+    +---------+---------+   
-            |                        |                        |             
-            |                        |                        |             
-            +------------------------+------------------------+             
-                                     |                                      
-                                     v                                      
-                     +---------------+---------------+                      
-                     |     bayesian.py (Core Model)  |                      
-                     | - Softmax Regime Calculation  |                      
-                     | - Kelly Criterion Sizing     |                      
-                     +---------------+---------------+                      
-                                     |                                      
-                                     v                                      
-                     +---------------+---------------+                      
-                     |     telegram_notifier.py      |                      
-                     |  - Multi-Part Report Splitting|                      
-                     |  - HITL Confirmation Prompt   |                      
-                     +---------------+---------------+                      
-                                     |                                      
-                                     v                                      
-                     +---------------+---------------+                      
-                     |      Human-In-The-Loop        |                      
-                     |   (Approve / Deny Trade)      |                      
-                     +---------------+---------------+                      
-                                     |                                      
-                                     v (On Approval)                        
-                     +---------------+---------------+                      
-                     |     ledger.json (State)       |                      
-                     +-------------------------------+                      
-```
-
----
-
-## 3. Detailed Component Implementation Specs
-
-### 3.1 Database & Space Control Engine (`crypto_analyst/db.py`)
-Responsible for persistent storage of market snapshots, parsed news, and predicted vs actual outcomes. Keeps database size under 5MB at all times.
-
-*   **Schema & Initialization (`init_db`)**:
-    *   `snapshots`: `id (PK)`, `timestamp (TEXT)`, `btc_price (REAL)`, `eth_price (REAL)`, `rsi (REAL)`, `trend_score (REAL)`, `momentum_score (REAL)`, `macro_support (REAL)`, `macro_risk (REAL)`, `raw_json (TEXT)`.
-    *   `news_events`: `id (PK)`, `headline_hash (TEXT UNIQUE)`, `title (TEXT)`, `source (TEXT)`, `event_type (TEXT)`, `score (REAL)`, `published_at (TEXT)`.
-    *   `regime_outcomes`: `id (PK)`, `timestamp (TEXT)`, `predicted_regime (TEXT)`, `predicted_prob (REAL)`, `actual_regime (TEXT)`, `resolved (INTEGER)`.
-*   **Data Retention & Pruning (`prune_old_data`)**:
-    *   Retain a rolling **30 days** of snapshots and news history. Any rows with timestamp older than 30 days are purged.
-    *   Invoke SQLite's `VACUUM;` immediately after pruning to reclaim raw disk sectors to the OS.
-*   **Expected Outcomes**: High-performance index lookups, zero disk inflation, database footprint capped at <5MB.
-
-### 3.2 Zero-Cost Geopolitical News Ingestor (`crypto_analyst/news_feed.py`)
-Parses public, rate-limit-free RSS feeds of major crypto news outlets without external dependencies.
-
-*   **Feeds Parsed**:
-    *   CoinDesk: `https://www.coindesk.com/arc/outboundfeeds/rss/`
-    *   CoinTelegraph: `https://cointelegraph.com/rss`
-    *   The Block: `https://www.theblock.co/rss/all`
-*   **Parsing Logic**: Uses standard Python `urllib.request` and `xml.etree.ElementTree`. Filter headlines on keywords (`Fed`, `SEC`, `inflation`, `ETF`, `yields`, `regulation`, etc.).
-*   **Bayesian Weight Classification**:
-    *   Match headlines to pre-defined categories:
-        *   `regulatory_cleared` (Weight: `+0.18`)
-        *   `regulatory_threat` (Weight: `-0.18`)
-        *   `macro_tightening` (Weight: `-0.15`)
-        *   `macro_easing` (Weight: `+0.15`)
-    *   Produce an aggregate `news_sentiment_score` clamped between `[-1.0, 1.0]` to pass as Tier 3 evidence into `bayesian.py`.
-*   **Deduplication**: Compare headline hash (MD5 of title + source) with `news_events` table before processing.
-*   **Expected Outcomes**: Automated, robust, zero-cost qualitative context ingestion without API lockouts.
-
-### 3.3 Dynamic Reporting & Telegram Notifier (`crypto_analyst/telegram_notifier.py`)
-Formats reports and dispatches them to Telegram while enforcing strict API validation and smart splitting.
-
-*   **Telegram Standard Formatting**: Beautiful markdown layout with strict header hierarchies, code boxes, and tables.
-*   **Smart Splitting**: Telegram enforces a **4,096-character limit** per message. The script will measure report length. If it exceeds 4,000 characters, it will slice the string cleanly at section boundary headings (e.g., `Part 1` contains Header through Quantitative; `Part 2` contains Interpretation through Learning Notes).
-*   **API Response Validation**: The notifier script must inspect the HTTP response of the Telegram Send API. It must verify the presence of a valid `message_id`. If absent, throw an explicit delivery exception.
-*   **Expected Outcomes**: Flawless, structured mobile reporting with zero split-word truncation or lost reports.
-
-### 3.4 Bayesian Engine Upgrade & Sizing (`crypto_analyst/bayesian.py`)
-Integrates raw indicators, news scores, and implements mathematical Kelly criterion sizing.
-
-*   **Softmax scoring update**: Receive `news_sentiment_score` from `news_feed.py` and map its impact into the 7 core regimes.
-*   **Half-Kelly Sizing Calculation (`suggest_allocation`)**:
-    *   $f^* = \frac{b \cdot p - q}{b}$
-    *   Where $p$ = posterior probability of the leading regime, $q = 1 - p$.
-    *   Assumed Risk/Reward ratio $b = 2.0$.
-    *   Safe allocation: Deploy **Half-Kelly** ($f^* / 2.0$) to smoothen equity volatility and prevent capital ruin.
-*   **Expected Outcomes**: Probability-grounded allocations directly derived from the Bayesian confidence scores.
-
-### 3.5 Orchestrator & State Ledger (`simulation_pipeline.py`)
-Binds the whole ecosystem together and holds the simulation state.
-
-*   **State Ledger (`ledger.json`)**: Initialized with:
-    ```json
-    {
-      "cash_usd": 1000.00,
-      "holdings": {},
-      "portfolio_value_usd": 1000.00,
-      "performance_metrics": {
-        "roi_percent": 0.0,
-        "days_elapsed": 0,
-        "win_rate": 0.0
-      },
-      "transaction_history": []
-    }
-    ```
-*   **HITL Verification Guard**: If the pipeline generates a trade suggestion (e.g., Change Cash allocation to BTC), the script writes a pending transaction state and dispatches a "Trade Awaiting Confirmation" prompt to Telegram/Chat. **No changes to `ledger.json` will occur without manual sign-off.**
-*   **Expected Outcomes**: Perfect record keeping, absolute user control over investment capital, and clinical simulation execution.
-
----
-
-## 4. Anti-Loop Error Handling & Expense Control
-To prevent infinite loops of API calls or script retries from generating excessive system costs or API usage, the application incorporates a rigorous **Fail-Fast & Handoff Policy**:
-
-1.  **Rule of Three (Retries)**: Any external request (sources parsing, RSS fetch, Telegram post) is limited to **exactly 3 attempts** using exponential backoff (delay: 5s, then 15s, then 45s).
-2.  **Failure Isolation & Stop**: If the 3rd attempt fails, the application will:
-    *   Log a high-severity `CRITICAL` record inside `WORKLOG.md` and the database.
-    *   Post a brief emergency alert to Telegram / User Chat summarizing the error.
-    *   Write a freeze flag to the system state (`pipeline_frozen: true`).
-    *   **Halt execution immediately**. Future scheduled cron runs will check this flag and immediately exit without making any network calls, preserving credits until a human resets the freeze flag.
-3.  **No Autonomous Troubleshooting in Production**: During cron/scheduled windows, the agent will act as a deterministic engine. If an exception occurs, it will *fail loudly and halt* rather than attempting to write new code or patches dynamically in the background.
-
----
-
-## 5. Replication & Bootstrap Procedure
-To re-duplicate this exact setup on any standard Linux/Docker server, execute the following steps in order:
-
-1.  **Clone & Initialize structure**:
-    Ensure directories exist: `crypto_analyst/data/`, `reports/`, `macready_core/logs/`.
-2.  **Bootstrap the Database**:
-    Run `python -c "from crypto_analyst.db import init_db; init_db()"` to construct `market_pulse.db`.
-3.  **Initialize Ledger**:
-    Ensure `ledger.json` is populated with $1,000.00 starting capital.
-4.  **Register Scheduler Trigger**:
-    Schedule `simulation_pipeline.py` via Agent Zero's scheduler tool using the cron pattern: `0 */3 * * *` (starting at 12am UTC).
-
----
-
-## 6. Expected Simulation Timeline (30 Days)
-*   **Days 1 - 5: Phase Baseline**: Establish a continuous feed of clean database historical data, fine-tune the RSS keyword categorization, and calibrate the starting weight learner priors.
-*   **Days 6 - 15: Execution Phase**: Deploy capital systematically based on Kelly-optimal guidelines, strictly respecting the HITL decision gates.
-*   **Days 16 - 25: Optimization Phase**: Let the Bayesian Weight Learner adjust core indicators weights based on actual outcomes, improving predictive precision.
-*   **Days 26 - 30: Final Synthesis**: Close out simulated trades, compile the final master performance audit, and verify the $3,000.00 ROI path.
-
----
-
-### **Please review this Procedural Blueprint carefully. Once you give your approval, I will begin Phase 1 (initializing WORKLOG.md) and progress step-by-step through the pipeline development.**
