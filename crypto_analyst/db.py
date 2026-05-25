@@ -170,9 +170,31 @@ def prune_old_data(days_limit: int = 30) -> None:
             
             cursor.execute("DELETE FROM delivery_audit WHERE timestamp < datetime('now', ?)", (cutoff_query,))
             
+            conn.commit()
+            conn.isolation_level = None
             cursor.execute("VACUUM")
+            conn.isolation_level = 'DEFERRED'
             conn.commit()
             
+            # Prune physical report files older than days_limit
+            reports_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reports")
+            if os.path.exists(reports_dir):
+                import time
+                now = time.time()
+                cutoff_sec = days_limit * 86400
+                reports_deleted = 0
+                for f in os.listdir(reports_dir):
+                    if f.startswith("report_") and f.endswith(".md"):
+                        fpath = os.path.join(reports_dir, f)
+                        if now - os.path.getmtime(fpath) > cutoff_sec:
+                            try:
+                                os.remove(fpath)
+                                reports_deleted += 1
+                            except Exception as fe:
+                                logger.warning(f"Could not delete stale local report file {f}: {fe}")
+                if reports_deleted > 0:
+                    logger.info(f"Pruned {reports_deleted} stale local report files from disk.")
+                    
             logger.info(f"Pruned {snapshots_deleted} snapshots and {news_deleted} news events. Vacuum complete.")
     except Exception as e:
         logger.error(f"Failed to prune database: {e}")
