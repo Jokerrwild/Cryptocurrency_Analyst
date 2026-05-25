@@ -19,6 +19,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         {"label": "SOL", "source": "coinbase", "product_id": "SOL-USD", "granularity_seconds": 3600},
         {"label": "XRP", "source": "coinbase", "product_id": "XRP-USD", "granularity_seconds": 3600},
         {"label": "ADA", "source": "coinbase", "product_id": "ADA-USD", "granularity_seconds": 3600},
+        {"label": "ZEC", "source": "coinbase", "product_id": "ZEC-USD", "granularity_seconds": 3600},
     ],
     "macro_assets": [
         {"label": "SPY", "source": "yahoo", "symbol": "SPY", "range": "3mo", "interval": "1d", "interpretation": "risk_on_equity"},
