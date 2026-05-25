@@ -329,7 +329,7 @@ def run_pipeline() -> None:
         if buy_list:
             rec_summary = f"BUY {', '.join(buy_list)} (Staged)"
         else:
-            rec_summary = "HOLD (Wait for conviction)"
+            rec_summary = "RULE-BASED HOLD (Conviction below threshold)"
             
         # Extract and append advanced technical metrics for each asset directly to quantitative evidence list
         for s in snapshot.crypto:
