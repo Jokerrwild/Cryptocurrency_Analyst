@@ -94,9 +94,8 @@ def compile_structured_report(
         f"*   **Generated Timestamp (UTC)**: {timestamp_utc}",
         f"*   **Interval Label**: 3-Hourly Scheduled Pulse"
     ]
-    for symbol in ["BTC", "ETH", "SOL", "XRP"]:
-        if symbol in asset_spot_prices:
-            header_lines.append(f"*   **{symbol} Spot Price**: ${asset_spot_prices[symbol]:,.2f} USD")
+    for symbol in list(asset_spot_prices.keys()):
+        header_lines.append(f"*   **{symbol} Spot Price**: ${asset_spot_prices[symbol]:,.2f} USD")
             
     header = "\n".join(header_lines)
 
