@@ -3,7 +3,7 @@ import sys
 import uuid
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Configure root logging
 logging.basicConfig(
@@ -26,7 +26,7 @@ from crypto_analyst.db import (
 from crypto_analyst.sources import fetch_market_snapshot
 from crypto_analyst.news_feed import ingest_and_score_news
 from crypto_analyst.bayesian import analyze_snapshot
-from crypto_analyst.indicators import momentum_score, trend_score
+from crypto_analyst.indicators import momentum_score, trend_score, rsi, ema, pct_change, volume_score
 from crypto_analyst.weight_learner import record_prediction, resolve_regime_outcome, run_adaptive_update
 from crypto_analyst.telegram_notifier import send_telegram_report
 from crypto_analyst.worklog_util import log_incident_or_event
@@ -185,7 +185,7 @@ def run_pipeline() -> None:
     run_id = str(uuid.uuid4())
     
     # Generate timestamps
-    now_utc = datetime.utcnow()
+    now_utc = datetime.now(timezone.utc)
     utc_now_str = now_utc.isoformat() + "Z"
     
     # Compute US Eastern Daylight Time (EDT = UTC - 4 hours)
@@ -233,7 +233,7 @@ def run_pipeline() -> None:
         spy_val = macro_map.get("SPY", 0.0)
         qqq_val = macro_map.get("QQQ", 0.0)
         dxy_val = macro_map.get("DX-Y.NYB", macro_map.get("DXY", 0.0))
-        tnx_val = macro_map.get("^TNX", 0.0)
+        tnx_val = macro_map.get("10Y", 0.0)
         
         macro_benchmarks_str = f"SPY=${spy_val:,.2f}, QQQ=${qqq_val:,.2f}, DXY={dxy_val:.2f}, US10Y={tnx_val:.2f}%"
         
@@ -330,6 +330,18 @@ def run_pipeline() -> None:
             rec_summary = f"BUY {', '.join(buy_list)} (Staged)"
         else:
             rec_summary = "HOLD (Wait for conviction)"
+            
+        # Extract and append advanced technical metrics for each asset directly to quantitative evidence list
+        for s in snapshot.crypto:
+            rsi_val = rsi(s.closes) or 0.0
+            ema20_val = ema(s.closes, 20) or 0.0
+            ema50_val = ema(s.closes, 50) or 0.0
+            move24h = pct_change(s.closes[-1], s.closes[-2] if len(s.closes) > 1 else None) or 0.0
+            move5d = pct_change(s.closes[-1], s.closes[-5] if len(s.closes) > 5 else None) or 0.0
+            v_score = volume_score(s)
+            analysis_result.quantitative_evidence.append(
+                f"{s.label} Indicators: RSI={rsi_val:.1f}, EMA20=${ema20_val:,.2f}, EMA50=${ema50_val:,.2f}, 24h={move24h:+.2f}%, 5d={move5d:+.2f}%, VolConf={v_score:.2f}"
+            )
             
         # Checkpoint 5: report rendered
         report_markdown = compile_structured_report(

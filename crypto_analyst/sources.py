@@ -77,7 +77,7 @@ def fetch_market_snapshot(cfg: Dict[str, Any]) -> MarketSnapshot:
     for asset in cfg.get("crypto_assets", []):
         product_id = asset.get("product_id", f"{asset['label']}-USD")
         granularity = asset.get("granularity_seconds", 3600)
-        crypto_series.append(fetch_coinbase_candles(product_id, granularity=granularity))
+        crypto_series.append(fetch_coinbase_candles(product_id, granularity=granularity, limit=150))
         
     macro_series = []
     for asset in cfg.get("macro_assets", []):
