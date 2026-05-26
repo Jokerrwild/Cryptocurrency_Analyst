@@ -1,11 +1,22 @@
 {
-  "cash_usd": 1000.0,
-  "holdings": {},
+  "cash_usd": 750.0,
+  "holdings": {
+    "NEAR": 91.57509157509158
+  },
   "portfolio_value_usd": 1000.0,
   "performance_metrics": {
     "roi_percent": 0.0,
     "days_elapsed": 0,
     "win_rate": 0.0
   },
-  "transaction_history": []
+  "transaction_history": [
+    {
+      "type": "BUY",
+      "asset": "NEAR",
+      "amount_usd": 250.0,
+      "amount_asset": 91.57509157509158,
+      "price": 2.73,
+      "timestamp": "2026-05-26T16:38:55.139395+00:00"
+    }
+  ]
 }
