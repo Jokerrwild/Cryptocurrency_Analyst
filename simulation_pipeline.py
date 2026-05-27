@@ -315,11 +315,27 @@ def run_pipeline() -> None:
         try:
             with open(LEDGER_PATH, "r") as lf:
                 ledger_data = json.load(lf)
-                portfolio_val = float(ledger_data.get("portfolio_value_usd", 1000.00))
+                cash_usd = float(ledger_data.get("cash_usd", 1000.00))
+                holdings = ledger_data.get("holdings", {})
+                
+                # Calculate dynamic mark-to-market portfolio value
+                holdings_val = 0.0
+                for asset, qty in holdings.items():
+                    spot_price = prices_map.get(asset, 0.0)
+                    holdings_val += float(qty) * spot_price
+                
+                portfolio_val = cash_usd + holdings_val
+                
+                # Update the ledger data with the new calculated value
+                ledger_data["portfolio_value_usd"] = portfolio_val
                 history = ledger_data.get("transaction_history", [])
                 if history:
                     last_tx = history[-1]
                     last_trade_str = f"[{last_tx.get('timestamp_utc', 'N/A')}] {last_tx.get('action', 'HOLD')} {last_tx.get('quantity', 0.0):.6f} {last_tx.get('asset', 'N/A')} @ ${last_tx.get('price', 0.0):,.2f} USD (Total: ${last_tx.get('total_usd', 0.0):,.2f} USD)"
+            
+            # Save the updated ledger back to disk
+            with open(LEDGER_PATH, "w") as lf:
+                json.dump(ledger_data, lf, indent=2)
         except Exception as le:
             logger.warning(f"Could not parse ledger state fields: {le}")
             

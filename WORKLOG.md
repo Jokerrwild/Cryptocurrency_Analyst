@@ -89,3 +89,33 @@ This document is a living, auditable log of all actions taken to build and confi
 *   **Prevention**: Always commit and finalize active database transactions before executing structural database maintenance or file-compaction queries.
 *   **Tags**: #database | #sqlite | #maintenance
 *   **Freeze Triggered**: Yes
+
+### Incident ID: d953a941-05bd-4c9e-93d1-175908a394e1
+*   **Timestamp (UTC)**: 2026-05-25 03:00:17
+*   **Symptom**: cannot VACUUM from within a transaction
+*   **Scope**: simulation_pipeline orchestration layer
+*   **Failed Hypotheses**: Pipeline serial step transition mapping
+*   **Root Cause**: Exception: OperationalError
+*   **Resolution**: System execution halted, scheduled triggers disabled to prevent runaway loops
+*   **Prevention**: Safe-escape markdown characters and prevent nested layout syntax
+*   **Tags**: #orchestrator | #multi_asset
+*   **Freeze Triggered**: Yes
+
+### Incident ID: 69ccd0a7-60d0-46bf-8583-fcf30afe33f3
+*   **Timestamp (UTC)**: 2026-05-25 03:00:51
+*   **Symptom**: cannot VACUUM from within a transaction
+*   **Scope**: simulation_pipeline orchestration layer
+*   **Failed Hypotheses**: Pipeline serial step transition mapping
+*   **Root Cause**: Exception: OperationalError
+*   **Resolution**: System execution halted, scheduled triggers disabled to prevent runaway loops
+*   **Prevention**: Safe-escape markdown characters and prevent nested layout syntax
+*   **Tags**: #orchestrator | #multi_asset
+*   **Freeze Triggered**: Yes
+
+### [2026-05-26] Dynamic Portfolio Valuation Implementation
+*   **Objective**: Resolve portfolio valuation discrepancy in the Executive Summary where the portfolio value remained static at $1,000 USD despite active holdings (e.g., NEAR).
+*   **Actions Taken**:
+    *   Patched `simulation_pipeline.py` to calculate the mark-to-market portfolio value dynamically by summing the cash balance and the current spot value of all active holdings (`cash_usd + sum(qty * spot_price)`).
+    *   Updated the script to write the newly calculated `portfolio_value_usd` back to `ledger.json` on each run to ensure the ledger file remains synchronized with the latest market prices.
+    *   Executed a successful test run of the pipeline (Run ID: `a795e760-e947-4f6c-ac6a-de2fc558f4a5`) and verified that `ledger.json` was updated correctly to `$982.14 USD` (reflecting the current spot price of NEAR at $2.535 USD).
+*   **Validation**: Verified that the generated report and `ledger.json` now correctly reflect the dynamic valuation of the portfolio.
