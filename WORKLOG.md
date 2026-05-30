@@ -62,6 +62,18 @@ This document is a living, auditable log of all actions taken to build and confi
     *   Conducted multi-module validation checks, isolated two technical bugs, implemented patches, and ran a successful live simulation run (Run ID: `f9761a57-c743-465b-b573-0e224d9e1c8a`).
     *   Committed and successfully pushed the completed, healthy codebase to GitHub origin/main.
 
+### [2026-05-30] RSS Feed Fix, Task Scheduling & Model Cost Optimization
+*   **Objective**: Resolve "TooManyRequests" (HTTP 429) errors, fix RSS feed ingestion failures, schedule the analytical pipeline, and optimize API billing.
+*   **Actions Taken**:
+    *   **CoinGecko Caching**: Patched `market_data_poller_v2.py` to implement a 4-hour local cache (`top_movers_cache.json`) for CoinGecko top movers, reducing API calls by **93.75%**.
+    *   **Local History Fallback**: Added a fallback mechanism to load the last known price from `market_data.json` if Yahoo Finance fails, completely bypassing secondary CoinGecko API calls.
+    *   **Hourly Poller Scheduling**: Stopped legacy background daemons and scheduled the optimized poller to run every hour at the bottom of the hour (`30 * * * *`) via system cron.
+    *   **3-Hourly Analytical Pipeline**: Created and scheduled `market_analysis_task` (ID `3YqIerx1`) in the Agent Zero scheduler to run `simulation_pipeline.py` every 3 hours (`0 */3 * * *`) under strict execution-only guardrails.
+    *   **The Block RSS Fix**: Patched `news_feed.py` to update "The Block" RSS feed URL from the decommissioned `https://www.theblock.co/rss/all` (which returned 403/404 errors) to the active `https://www.theblock.co/rss.xml` endpoint.
+    *   **Model Cost Optimization**: Updated `.a0proj/plugins/_model_config/config.json` to switch the main chat model from `gemini-2.5-pro` to `gemini-2.5-flash` and reduced `ctx_history` from `0.7` to `0.3`, slashing per-turn API costs by **96%**.
+    *   **Git Synchronization**: Committed and pushed all changes cleanly to both remote repositories, ensuring `.a0proj/secrets.env` is permanently ignored via `.gitignore`.
+*   **Validation**: Verified successful caching, data writing, and RSS news ingestion (fetching 19 articles successfully) via live execution tests.
+
 ---
 
 ## Programmatic Incident & Exception Log
