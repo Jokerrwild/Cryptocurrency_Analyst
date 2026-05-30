@@ -1,38 +1,38 @@
 {
-  "timestamp_utc": "2026-05-30T16:31:43.921317+00:00Z",
-  "run_id": "e2aac63d-3907-453d-a493-20c383e58485",
+  "timestamp_utc": "2026-05-30T19:00:59.327298+00:00Z",
+  "run_id": "054b14d5-093a-4894-a7de-a5f53231bd15",
   "global_regime": "Neutral consolidation",
-  "global_confidence": "Medium",
+  "global_confidence": "Low",
   "recommendations": [
-    {
-      "asset": "XLM",
-      "action": "HOLD",
-      "allocation_percentage": 0.0,
-      "spot_price": 0.243074
-    },
     {
       "asset": "BNB",
       "action": "HOLD",
       "allocation_percentage": 0.0,
-      "spot_price": 700.42
+      "spot_price": 715.48
+    },
+    {
+      "asset": "XLM",
+      "action": "HOLD",
+      "allocation_percentage": 0.0,
+      "spot_price": 0.2483
     },
     {
       "asset": "HYPE",
       "action": "HOLD",
       "allocation_percentage": 0.0,
-      "spot_price": 66.73
+      "spot_price": 68.18
     },
     {
       "asset": "XRP",
       "action": "HOLD",
       "allocation_percentage": 0.0,
-      "spot_price": 1.3431
+      "spot_price": 1.3501
     },
     {
       "asset": "DOGE",
       "action": "HOLD",
       "allocation_percentage": 0.0,
-      "spot_price": 0.10133
+      "spot_price": 0.10137
     }
   ],
   "approved": false

@@ -13,7 +13,7 @@ logger = logging.getLogger("crypto_analyst.news_feed")
 RSS_FEEDS = {
     "CoinDesk": "https://www.coindesk.com/arc/outboundfeeds/rss/",
     "CoinTelegraph": "https://cointelegraph.com/rss",
-    "The Block": "https://www.theblock.co/rss/all"
+    "The Block": "https://www.theblock.co/rss.xml"
 }
 
 # Keyword-based categorization weights
@@ -47,7 +47,7 @@ def parse_rss_feed(source_name: str, feed_url: str) -> List[Dict[str, str]]:
         # Set a standard User-Agent to avoid HTTP 403 Forbidden errors
         req = urllib.request.Request(
             feed_url,
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'}
         )
         with urllib.request.urlopen(req, timeout=15) as response:
             xml_data = response.read()
