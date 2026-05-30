@@ -1,0 +1,109 @@
+### **System Analysis Report**
+*   **Report ID**: `6756b38e-db5d-4923-b6d5-cbb5ccdb8d62`
+*   **Generated Timestamp (UTC)**: 2026-05-27T09:00:25.210728+00:00Z
+*   **Interval Label**: 3-Hourly Scheduled Pulse
+*   **BTC Spot Price**: $75,738.77 USD
+*   **ETH Spot Price**: $2,081.20 USD
+*   **SOL Spot Price**: $83.85 USD
+*   **XRP Spot Price**: $1.33 USD
+*   **USD1 Spot Price**: $1.00 USD
+*   **NEAR Spot Price**: $2.52 USD
+*   **HYPE Spot Price**: $62.13 USD
+*   **BNB Spot Price**: $653.02 USD
+*   **ZEC Spot Price**: $573.90 USD
+*   **DOGE Spot Price**: $0.10 USD
+
+### **Executive Summary**
+*   **Date/Time (US EDT) of the analysis**: 2026-05-27 05:00:25 AM EDT
+*   **Portfolio Current Value**: $981.23 USD
+*   **The Last Trade**: [2026-05-26T16:38:55.139395+00:00] BUY 91.575092 NEAR @ $2.73 USD (Total: $250.00 USD)
+*   **Recommendation (HOLD / BUY / SELL) currency**: <b>RULE-BASED HOLD (Conviction below threshold)</b>
+    *   *Key Macro Indicators*: SPY=$750.59, QQQ=$730.28, DXY=99.09, US10Y=4.49%
+    *   *Market Trend Probability*: Neutral consolidation (30.6% probability)
+
+
+### **Market Thesis**
+Leading regime is classified as *Neutral consolidation* with a posterior probability weight of *30.6%*.
+
+### **Probability Table**
+```text
+Market Regime                  | Probability | Confidence
+----------------------------------------------------------
+Neutral consolidation          | 30.6%       | Medium    
+Bullish accumulation           | 14.7%       | Low       
+Macro-driven risk-off          | 12.3%       | Low       
+Bullish continuation           | 12.2%       | Low       
+High-volatility transition     | 11.9%       | Low       
+Bearish continuation           | 9.3%        | Low       
+Bearish distribution           | 9.0%        | Low       
+```
+
+### **Quantitative Evidence**
+* BTC latest close: $75,738.77
+* Trend score: -0.080 (positive = above EMA-50)
+* Momentum score: -0.036 (EMA-12 vs EMA-26 spread)
+* Volatility score: 0.029 (0=calm, 1=extreme)
+* Volume score: 0.088 (0.5=avg, 1.0=2x avg)
+* Macro support: +0.250 (equity trend minus DXY drag)
+*   Momentum [HYPE]: +0.025
+*   Momentum [DOGE]: +0.001
+*   Momentum [USD1]: -0.001
+*   Momentum [BNB]: -0.027
+*   Momentum [SOL]: -0.027
+*   Momentum [ETH]: -0.027
+*   Momentum [XRP]: -0.029
+*   Momentum [BTC]: -0.036
+*   Momentum [NEAR]: -0.186
+*   Momentum [ZEC]: -0.230
+* BTC Indicators: RSI=50.7, EMA20=$75,956.98, EMA50=$76,349.35, 24h=-0.15%, 5d=+0.39%, VolConf=0.09
+* ETH Indicators: RSI=62.0, EMA20=$2,079.73, EMA50=$2,089.45, 24h=+0.04%, 5d=+0.59%, VolConf=0.26
+* SOL Indicators: RSI=57.4, EMA20=$83.97, EMA50=$84.44, 24h=-0.26%, 5d=+0.40%, VolConf=0.14
+* XRP Indicators: RSI=57.3, EMA20=$1.33, EMA50=$1.34, 24h=+0.19%, 5d=+0.26%, VolConf=0.30
+* USD1 Indicators: RSI=46.2, EMA20=$1.00, EMA50=$1.00, 24h=+0.00%, 5d=-0.01%, VolConf=0.53
+* NEAR Indicators: RSI=37.3, EMA20=$2.59, EMA50=$2.59, 24h=+0.36%, 5d=+0.72%, VolConf=0.50
+* HYPE Indicators: RSI=52.7, EMA20=$61.15, EMA50=$61.10, 24h=+0.03%, 5d=+2.34%, VolConf=0.17
+* BNB Indicators: RSI=43.0, EMA20=$655.31, EMA50=$656.98, 24h=+0.07%, 5d=-0.04%, VolConf=0.18
+* ZEC Indicators: RSI=41.3, EMA20=$584.09, EMA50=$606.93, 24h=-0.03%, 5d=+0.54%, VolConf=0.22
+* DOGE Indicators: RSI=67.1, EMA20=$0.10, EMA50=$0.10, 24h=-0.08%, 5d=+0.47%, VolConf=0.13
+
+### **Qualitative Evidence**
+* DeFi isn't safe anymore because AI is becoming 'superhuman' at hacking, security chief warns
+* Whale alert: Someone dumped $1.29 billion of BlackRock's bitcoin ETF in a dark pool trade
+* Crypto PACs spend $9 million in Texas and score wins in both parties
+* Ethereum bull David Hoffman explains why he sold his ETH
+* Sharplink, Forward Industries among crypto firms considered for Russell indexes
+* Aggregate News Sentiment Score: -0.18 (Weights: Clear/Threat ±0.18, Easing/Tightening ±0.15)
+* Regulatory Sentiment Bias: +0.10
+
+### **Interpretation**
+Leading regime is 'Neutral consolidation' with posterior probability 30.6% (confidence: Medium). Trend signal is negative (-0.08) and momentum is waning (-0.04). Treat this as a probabilistic belief state, not a deterministic prediction.
+
+### **Invalidation Conditions**
+* Regime velocity exceeds 5% shift toward Bullish or Bearish
+* Volume breakout above 1.5x average
+
+### **Risk-Aware Decision Support**
+**Global Thesis Action Strategy**: Guided by Bayesian Regime *Neutral consolidation*.
+
+**Top 5 Currencies Priority List**:
+```text
+Rank | Asset  | Spot Price   | Momentum   | Rec Allocation 
+----------------------------------------------------------
+1    | HYPE   | $62.13       | +0.025     | 0.0% (HOLD)    
+2    | DOGE   | $0.10        | +0.001     | 0.0% (HOLD)    
+3    | USD1   | $1.00        | -0.001     | 0.0% (HOLD)    
+4    | BNB    | $653.02      | -0.027     | 0.0% (HOLD)    
+5    | SOL    | $83.85       | -0.027     | 0.0% (HOLD)    
+```
+
+All suggestions are trade recommendations awaiting strict Human-in-the-Loop (HITL) manual confirmation.
+
+### **What To Monitor Next**
+* BTC close relative to EMA-50
+* DXY trend continuation or reversal
+* SPY/QQQ session volume
+* Regulatory headlines for tracked assets
+* Regime velocity (probability shift >5% vs last interval)
+
+### **Learning Notes**
+Model weights adaptively learned using historical priors. Minimum conviction threshold enforced at 55%. If leading probability falls below conviction threshold, recommended allocation defaults to HOLD state across all assets.

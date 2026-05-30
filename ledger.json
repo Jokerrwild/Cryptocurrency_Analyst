@@ -1,22 +1,31 @@
 {
-  "cash_usd": 750.0,
+  "cash_usd": 500.0,
   "holdings": {
-    "NEAR": 91.57509157509158
+    "NEAR": 91.57509157509158,
+    "XLM": 1315.7894736842104
   },
-  "portfolio_value_usd": 1000.0,
+  "portfolio_value_usd": 1034.8525255446307,
   "performance_metrics": {
-    "roi_percent": 0.0,
+    "roi_percent": -4.029304029304035,
     "days_elapsed": 0,
     "win_rate": 0.0
   },
   "transaction_history": [
     {
-      "type": "BUY",
+      "timestamp_utc": "2026-05-26T16:38:55.139395+00:00",
+      "action": "BUY",
       "asset": "NEAR",
-      "amount_usd": 250.0,
-      "amount_asset": 91.57509157509158,
+      "quantity": 91.57509157509158,
       "price": 2.73,
-      "timestamp": "2026-05-26T16:38:55.139395+00:00"
+      "total_usd": 250.0
+    },
+    {
+      "action": "BUY",
+      "asset": "XLM",
+      "total_usd": 250.0,
+      "quantity": 1315.7894736842104,
+      "price": 0.19,
+      "timestamp_utc": "2026-05-28T17:48:57.677132+00:00"
     }
   ]
 }

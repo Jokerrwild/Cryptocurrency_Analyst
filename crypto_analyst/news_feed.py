@@ -21,7 +21,8 @@ EVENT_WEIGHTS = {
     "regulatory_cleared": 0.18,
     "regulatory_threat": -0.18,
     "macro_tightening": -0.15,
-    "macro_easing": 0.15
+    "macro_easing": 0.15,
+    "utility_threat": -0.25
 }
 
 # Categorization Keyword mappings
@@ -29,7 +30,8 @@ KEYWORD_MAPS = {
     "regulatory_cleared": ["approved", "cleared", "dismissed", "settled", "dropped", "victory", "ends investigation"],
     "regulatory_threat": ["probe", "lawsuit", "subpoena", "enforcement", "warns", "sues", "charges", "banned", "restrict"],
     "macro_tightening": ["fed rate hike", "hawkish", "rate hike", "inflation high", "tightening", "yields spike"],
-    "macro_easing": ["rate cut", "dovish", "easing", "inflation cools", "yields drop"]
+    "macro_easing": ["rate cut", "dovish", "easing", "inflation cools", "yields drop"],
+    "utility_threat": ["labeled", "deanonymized", "exploit", "hack", "breach", "vulnerability", "deanonymize", "tracing", "heuristics"]
 }
 
 def generate_headline_hash(title: str, source: str) -> str:

@@ -1,1 +1,5 @@
-venv/\n__pycache__/\n.git/\nlogs/
+venv/
+__pycache__/
+.git/
+logs/
+.a0proj/secrets.env

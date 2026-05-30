@@ -30,6 +30,10 @@ _REGULATORY_DATA: dict[str, dict] = {
         "bias": 0.0,
         "notes": "No significant regulatory activity. Neutral.",
     },
+    "ZEC": {
+        "bias": -0.35,
+        "notes": "Arkham Intelligence de-anonymized over 53% of Zcash transactions by tracing transparent addresses, severely undermining its core privacy value proposition and increasing regulatory/compliance headwinds.",
+    },
 }
 
 _DEFAULT = {"bias": 0.0, "notes": "No regulatory data available for this asset."}
