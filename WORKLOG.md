@@ -131,3 +131,11 @@ This document is a living, auditable log of all actions taken to build and confi
     *   Updated the script to write the newly calculated `portfolio_value_usd` back to `ledger.json` on each run to ensure the ledger file remains synchronized with the latest market prices.
     *   Executed a successful test run of the pipeline (Run ID: `a795e760-e947-4f6c-ac6a-de2fc558f4a5`) and verified that `ledger.json` was updated correctly to `$982.14 USD` (reflecting the current spot price of NEAR at $2.535 USD).
 *   **Validation**: Verified that the generated report and `ledger.json` now correctly reflect the dynamic valuation of the portfolio.
+
+### [2026-05-31] Google Suite Plugin Dependency Persistence Fix
+*   **Objective**: Resolve the persistent `No module named 'google_auth_oauthlib'` error affecting the Google Suite plugin (`_email_integration`) across VM restarts in an immutable environment.
+*   **Actions Taken**:
+    *   **Root Cause Isolated**: Discovered that `google_auth_oauthlib` was installed in the agent's environment (`/opt/venv`) but was completely missing from the framework's server environment (`/opt/venv-a0`). Since the plugin's API handlers load directly into the WebUI server process, the server crashed with an `ImportError` on startup.
+    *   **Immediate Fix**: Installed `google_auth_oauthlib` directly into the framework's server environment (`/opt/venv-a0/bin/pip install google_auth_oauthlib`), immediately restoring plugin functionality for the active session.
+    *   **Persistent Fix (Strategy 2)**: Created a persistent startup extension script at `/a0/usr/workdir/MacReady/macready_config/_02_install_dependencies.py` that inherits from the framework's `Extension` class. This script automatically runs `/opt/venv-a0/bin/pip install google_auth_oauthlib` on every container boot, ensuring the dependency is restored and maintained across VM restarts in the immutable environment.
+*   **Validation**: Verified successful installation and import of `google_auth_oauthlib` inside the `/opt/venv-a0` environment.
