@@ -1,6 +1,6 @@
 # Market Analysis Task
 
-**Status**: Completed
+**Status**: Idle
 **Objective**: Perform comprehensive market analysis to determine optimal investment/liquidation points.
 
 ## Steps

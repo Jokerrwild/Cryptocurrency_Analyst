@@ -53,12 +53,19 @@ def init_ledger() -> None:
         logger.info(f"Initialized ledger.json starting balance: $1,000.00 USD")
 
 def get_current_portfolio_value() -> float:
-    """Reads current mark-to-market valuation from the state ledger."""
+    """Calculates current mark-to-market valuation dynamically from holdings."""
     try:
         with open(LEDGER_PATH, "r") as f:
             ledger = json.load(f)
-            return float(ledger.get("portfolio_value_usd", 1000.00))
-    except Exception:
+        holdings = ledger.get("holdings", {})
+        snapshot = fetch_market_snapshot()
+        total_value = ledger.get("cash_usd", 0.0)
+        for asset, qty in holdings.items():
+            price = snapshot.get(asset, 0.0)
+            total_value += qty * price
+        return float(total_value)
+    except Exception as e:
+        logger.error(f"Failed to calculate dynamic portfolio value: {e}")
         return 1000.00
 
 def compile_structured_report(

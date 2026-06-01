@@ -1,10 +1,12 @@
 {
-  "cash_usd": 500.0,
+  "cash_usd": 0.0,
   "holdings": {
     "NEAR": 91.57509157509158,
-    "XLM": 1315.7894736842104
+    "XLM": 1315.7894736842104,
+    "HYPE": 3.656574,
+    "ZEC": 0.458362
   },
-  "portfolio_value_usd": 1039.5310391363023,
+  "portfolio_value_usd": 1095.5004917877425,
   "performance_metrics": {
     "roi_percent": -4.029304029304035,
     "days_elapsed": 0,
@@ -26,6 +28,22 @@
       "quantity": 1315.7894736842104,
       "price": 0.19,
       "timestamp_utc": "2026-05-28T17:48:57.677132+00:00"
+    },
+    {
+      "action": "BUY",
+      "asset": "HYPE",
+      "total_usd": 250.0,
+      "quantity": 3.656574,
+      "price": 68.37,
+      "timestamp_utc": "2026-05-31T19:42:24+00:00"
+    },
+    {
+      "action": "BUY",
+      "asset": "ZEC",
+      "total_usd": 250.0,
+      "quantity": 0.458362,
+      "price": 545.42,
+      "timestamp_utc": "2026-05-31T19:42:24+00:00"
     }
   ]
 }

@@ -37,6 +37,19 @@ This document is a living, auditable log of all actions taken to build and confi
 
 ## Active Log of Changes & Resolutions
 
+### 2026-06-01: Portfolio Valuation and Asset Inclusion Fixes
+- **Issue**: Portfolio valuation in reports was stale ($836.50) and ZEC was missing from market snapshots.
+- **Fix 1 (Valuation)**: Patched `simulation_pipeline.py` to calculate portfolio value dynamically by summing cash and current market value of all holdings, removing reliance on the static `portfolio_value_usd` field in `ledger.json`.
+- **Fix 2 (Asset Inclusion)**: Refactored `crypto_analyst/sources.py` to merge dynamically discovered assets with the static `crypto_assets` list from `config.py`. This ensures priority assets like ZEC are always included in snapshots.
+- **Verification**: Ran pipeline (run ID: 1c6b0d9b-e1ee-48a4-8502-be72152b8d6d). Confirmed report shows accurate dynamic valuation of $1,095.50 USD including ZEC.
+## 2026-05-31: Ledger Integrity & Trade Execution Upgrade
+- **Issue**: Ledger data loss occurred due to unreliable trade execution script (`execute_dca_trade.py`) overwriting the ledger.
+- **Mitigation**: 
+    - Implemented `trade_executor.py` to replace hardcoded scripts. It features input validation, atomic ledger updates, and automated backups.
+    - Integrated automated git commits and pushes to the remote repository after every trade to ensure a permanent audit trail.
+    - Restored ledger state from git commit `d74e1107116ec279070df0fc3908b691c68654ff` to recover lost XLM holdings.
+- **Status**: Mitigation strategy fully implemented and active.
+
 ### [2026-05-24] Initial Baseline & Blueprint Sync
 *   **Objective**: Clear old merge conflicts, align git environment, and define the master procedural blueprint.
 *   **Actions Taken**:
