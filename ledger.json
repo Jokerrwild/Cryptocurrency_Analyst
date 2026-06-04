@@ -6,9 +6,9 @@
     "HYPE": 3.656574,
     "ZEC": 0.458362
   },
-  "portfolio_value_usd": 1095.5004917877425,
+  "portfolio_value_usd": 1122.17,
   "performance_metrics": {
-    "roi_percent": -4.029304029304035,
+    "roi_percent": 4.96,
     "days_elapsed": 0,
     "win_rate": 0.0
   },
@@ -34,16 +34,16 @@
       "asset": "HYPE",
       "total_usd": 250.0,
       "quantity": 3.656574,
-      "price": 68.37,
-      "timestamp_utc": "2026-05-31T19:42:24+00:00"
+      "price": 72.50,
+      "timestamp_utc": "2026-06-03T09:50:00+00:00"
     },
     {
       "action": "BUY",
       "asset": "ZEC",
       "total_usd": 250.0,
       "quantity": 0.458362,
-      "price": 545.42,
-      "timestamp_utc": "2026-05-31T19:42:24+00:00"
+      "price": 621.12,
+      "timestamp_utc": "2026-06-03T09:50:00+00:00"
     }
   ]
 }
